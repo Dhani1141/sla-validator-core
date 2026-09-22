@@ -3,14 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Network Telemetry & Forensic Suite</title>
+    <title>SLA Validator Core // Cyber-Forensic Edition</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
         body {
-            background-color: #050505;
-            color: #00ff00;
+            background-color: #020202;
+            color: #00ff66;
             font-family: 'Consolas', 'Courier New', monospace;
             font-size: 14px;
             margin: 0;
@@ -23,57 +21,50 @@
             max-width: 1000px;
             margin: 0 auto;
             line-height: 1.5;
-            text-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
+            text-shadow: 0 0 8px rgba(0, 255, 102, 0.4);
         }
-        .log-line {
-            margin: 4px 0;
-            word-wrap: break-word;
-        }
+        .log-line { margin: 4px 0; word-wrap: break-word; }
         .cursor {
             display: inline-block;
             width: 8px;
             height: 15px;
-            background-color: #00ff00;
+            background-color: #00ff66;
             vertical-align: text-bottom;
-            animation: blink 1s step-end infinite;
+            animation: blink 0.8s step-end infinite;
             margin-left: 2px;
         }
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
         
-        .color-red { color: #ff3333; text-shadow: 0 0 5px rgba(255, 51, 51, 0.5); }
-        .color-orange { color: #ff9933; text-shadow: 0 0 5px rgba(255, 153, 51, 0.5); }
-        .color-yellow { color: #ffff33; text-shadow: 0 0 5px rgba(255, 255, 51, 0.5); }
-        .color-green { color: #00ff00; }
-        .color-gray { color: #888888; text-shadow: none; font-size: 12px; }
-        .color-cyan { color: #00ffff; text-shadow: 0 0 5px rgba(0, 255, 255, 0.5); }
+        .color-red { color: #ff3333; text-shadow: 0 0 8px rgba(255, 51, 51, 0.6); }
+        .color-orange { color: #ff9933; text-shadow: 0 0 8px rgba(255, 153, 51, 0.6); }
+        .color-yellow { color: #ffff33; text-shadow: 0 0 8px rgba(255, 255, 51, 0.6); }
+        .color-green { color: #00ff66; }
+        .color-gray { color: #777777; text-shadow: none; font-size: 12px; }
+        .color-cyan { color: #00ffff; text-shadow: 0 0 8px rgba(0, 255, 255, 0.6); }
         
-        /* Tombol Aksi WhatsApp ala Terminal */
         .wa-btn {
             display: inline-block;
             margin-top: 10px;
-            padding: 8px 15px;
-            background-color: #003300;
-            color: #00ff00;
-            border: 1px solid #00ff00;
+            padding: 10px 18px;
+            background-color: #002200;
+            color: #00ff66;
+            border: 1px solid #00ff66;
             text-decoration: none;
             font-family: 'Consolas', 'Courier New', monospace;
             font-weight: bold;
-            box-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
             transition: all 0.2s ease;
         }
         .wa-btn:hover {
-            background-color: #00ff00;
-            color: #050505;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.8);
+            background-color: #00ff66;
+            color: #020202;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.8);
         }
 
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #004400; }
-        ::-webkit-scrollbar-thumb:hover { background: #00ff00; }
+        ::-webkit-scrollbar-thumb { background: #003311; }
+        ::-webkit-scrollbar-thumb:hover { background: #00ff66; }
     </style>
 </head>
 <body>
@@ -83,15 +74,8 @@
     <script>
         const terminal = document.getElementById('terminal');
 
-        function sleep(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
-        function removeCursor() {
-            const cursor = document.getElementById('cursor');
-            if (cursor) cursor.remove();
-        }
-
+        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+        function removeCursor() { const cursor = document.getElementById('cursor'); if (cursor) cursor.remove(); }
         function appendCursor(container) {
             removeCursor();
             const cursorSpan = document.createElement('span');
@@ -99,7 +83,6 @@
             cursorSpan.className = 'cursor';
             container.appendChild(cursorSpan);
         }
-
         function printLine(text, colorClass = '') {
             const line = document.createElement('div');
             line.className = 'log-line ' + colorClass;
@@ -107,12 +90,10 @@
             terminal.appendChild(line);
             window.scrollTo(0, document.body.scrollHeight);
         }
-
-        async function printTypewriter(text, delay = 10, colorClass = '') {
+        async function printTypewriter(text, delay = 8, colorClass = '') {
             const line = document.createElement('div');
             line.className = 'log-line ' + colorClass;
             terminal.appendChild(line);
-            
             for (let i = 0; i < text.length; i++) {
                 line.textContent += text[i];
                 appendCursor(line);
@@ -121,7 +102,7 @@
             window.scrollTo(0, document.body.scrollHeight);
         }
 
-        async function measurePingAndJitter() {
+        async function measurePingAndJitter(targetUrl) {
             let pings = [];
             for (let i = 0; i < 5; i++) {
                 let start = performance.now();
@@ -129,18 +110,16 @@
                     let img = new Image();
                     img.onload = resolve;
                     img.onerror = resolve; 
-                    img.src = "https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif?cb=" + Math.random();
+                    img.src = targetUrl + "?cb=" + Math.random();
                 });
                 pings.push(performance.now() - start);
             }
-            
-            let avgPing = pings.reduce((a, b) => a + b) / pings.length;
+            let avgPing = pings.reduce((a, b) => a + b, 0) / pings.length;
             let jitter = 0;
             for(let i = 1; i < pings.length; i++) {
                 jitter += Math.abs(pings[i] - pings[i-1]);
             }
             jitter = jitter / (pings.length - 1);
-            
             return { ping: avgPing, jitter: jitter };
         }
 
@@ -149,18 +128,11 @@
             const dummyData = new Uint8Array(payloadSize);
             const blob = new Blob([dummyData]);
             const start = performance.now();
-            
             try {
-                await fetch('https://speed.cloudflare.com/__up', {
-                    method: 'POST',
-                    body: blob
-                });
+                await fetch('https://speed.cloudflare.com/__up', { method: 'POST', body: blob });
                 const duration = (performance.now() - start) / 1000;
-                const speedMbps = (payloadSize * 8 / duration) / 1000000;
-                return speedMbps;
-            } catch (e) {
-                return null; 
-            }
+                return (payloadSize * 8 / duration) / 1000000;
+            } catch (e) { return null; }
         }
 
         function snapToStandardTier(rawSpeed) {
@@ -169,20 +141,24 @@
             let minDiff = Math.abs(rawSpeed - closest);
             for (let i = 1; i < tiers.length; i++) {
                 let diff = Math.abs(rawSpeed - tiers[i]);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closest = tiers[i];
-                }
+                if (diff < minDiff) { minDiff = diff; closest = tiers[i]; }
             }
             return closest;
         }
 
         async function runDiagnostics() {
-            await printTypewriter('Initializing Advanced Telemetry & WhatsApp Dispatcher...');
-            await sleep(400);
+            await printTypewriter('Initializing Cyber-Forensic Autonomous Suite v4.0...');
+            await sleep(300);
             printLine('');
 
-            await printTypewriter('[*] Fetching network topology & routing node...');
+            // PARSE URL PARAMETERS
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlDl = parseFloat(urlParams.get('dl'));
+            const urlUl = parseFloat(urlParams.get('ul'));
+            const serverMode = urlParams.get('mode') || 'global'; // 'local' or 'global'
+
+            await printTypewriter(`[*] Target Execution Mode: [ ${serverMode.toUpperCase()} GATEWAY ]`, 'color-cyan');
+            await printTypewriter('[*] Intercepting network topology & routing descriptors...');
             await sleep(300);
             
             let ispOrg = "Unknown";
@@ -195,17 +171,13 @@
                 ispOrg = `${data.org || 'Unknown'} / ${data.asn || 'Unknown'}`;
                 clientLoc = `${data.city || 'Unknown'}, ${data.region || 'Unknown'}`;
 
-                await printTypewriter(`[+] IP Address: ${clientIP}`);
-                await printTypewriter(`[+] ISP/ASN: ${ispOrg}`);
-                await printTypewriter(`[+] Location Node: ${clientLoc}`);
+                await printTypewriter(`[+] Host IP: ${clientIP}`);
+                await printTypewriter(`[+] Target Autonomous ISP: ${ispOrg}`);
+                await printTypewriter(`[+] Node Region: ${clientLoc}`);
             } catch (e) {
-                await printTypewriter('[-] Network topology hidden by client security.', 'color-orange');
+                await printTypewriter('[-] Topology obfuscated by client firewall.', 'color-orange');
             }
             printLine('');
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const urlDl = parseFloat(urlParams.get('dl'));
-            const urlUl = parseFloat(urlParams.get('ul'));
 
             let expectedDL = 0;
             let expectedUL = 0;
@@ -213,9 +185,9 @@
             if (!isNaN(urlDl) && urlDl > 0 && !isNaN(urlUl) && urlUl > 0) {
                 expectedDL = urlDl;
                 expectedUL = urlUl;
-                await printTypewriter(`[*] Target SLA injected via URL Protocol: ${expectedDL} DL / ${expectedUL} UL Mbps`, 'color-yellow');
+                await printTypewriter(`[*] SLA Target Injected via Protocol: ${expectedDL} DL / ${expectedUL} UL Mbps`, 'color-yellow');
             } else {
-                await printTypewriter(`[*] No SLA parameters. Running Auto-Calibration Probe...`, 'color-yellow');
+                await printTypewriter(`[*] Zero-Config Mode: Executing Neural Baseline Calibration...`, 'color-yellow');
                 
                 const calibrationURL = "https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg";
                 const fileSizeBits = 5242880 * 8;
@@ -234,102 +206,105 @@
                 expectedDL = snapToStandardTier(rawCalibSpeed);
                 expectedUL = Math.round(expectedDL * 0.5);
                 
-                await printTypewriter(`[+] Baseline Locked: ~${rawCalibSpeed.toFixed(2)} Mbps. Snapped to SLA Tier: ${expectedDL} Mbps`, 'color-green');
+                await printTypewriter(`[+] Baseline Locked: ~${rawCalibSpeed.toFixed(2)} Mbps -> Mapped Tier: ${expectedDL} Mbps`, 'color-green');
             }
             
             printLine('');
-            await printTypewriter(`[*] Target Reference Locked: ${expectedDL} DL / ${expectedUL} UL Mbps`);
-            await sleep(400);
+            await printTypewriter(`[*] Reference Threshold Locked: ${expectedDL} DL / ${expectedUL} UL Mbps`);
+            await sleep(300);
             printLine('');
 
-            await printTypewriter('[*] Executing Micro-Probes (Ping & Jitter)...');
-            const { ping, jitter } = await measurePingAndJitter();
-            await printTypewriter(`[+] Latency (Ping): ${ping.toFixed(1)} ms`);
-            await printTypewriter(`[+] Network Jitter: ${jitter.toFixed(1)} ms`);
+            // Tentukan target probe berdasarkan mode (local/global)
+            let pingTarget = "https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif";
+            let downloadTarget = "https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg";
+
+            await printTypewriter(`[*] Executing Micro-Probes on [${serverMode.toUpperCase()}] infrastructure...`);
+            const { ping, jitter } = await measurePingAndJitter(pingTarget);
+            await printTypewriter(`[+] Core Latency: ${ping.toFixed(1)} ms`);
+            await printTypewriter(`[+] Signal Jitter: ${jitter.toFixed(1)} ms`);
             printLine('');
 
-            await printTypewriter('[*] Initiating Full Download Payload (Ingestion)...');
-            const targetURL = `https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg`;
+            await printTypewriter('[*] Ingesting High-Density Data Payload...');
             const fileSizeBits = 5242880 * 8; 
-            
             const download = new Image();
             const startDL = performance.now();
-            const cacheBuster = "?cb=" + Math.random();
             
             download.onload = async function() {
                 const durationSecDL = (performance.now() - startDL) / 1000;
                 const speedMbpsDL = (fileSizeBits / durationSecDL) / 1000000;
                 
-                await printTypewriter(`[+] Download Speed: ${speedMbpsDL.toFixed(2)} Mbps`);
+                await printTypewriter(`[+] Download Throughput: ${speedMbpsDL.toFixed(2)} Mbps`);
                 printLine('');
                 
-                await printTypewriter('[*] Initiating Upload Payload (Exfiltration)...');
+                await printTypewriter('[*] Exfiltrating Test Upload Payload...');
                 const speedUL = await measureUpload();
-                
-                let speedMbpsUL = 0;
-                if (speedUL === null) {
-                    await printTypewriter(`[-] Upload test blocked by strict client CORS policy.`, 'color-orange');
+                let speedMbpsUL = speedUL !== null ? speedUL : 0;
+                if (speedUL !== null) {
+                    await printTypewriter(`[+] Upload Throughput: ${speedMbpsUL.toFixed(2)} Mbps`);
                 } else {
-                    speedMbpsUL = speedUL;
-                    await printTypewriter(`[+] Upload Speed: ${speedMbpsUL.toFixed(2)} Mbps`);
+                    await printTypewriter(`[-] Upload restricted by policy.`, 'color-orange');
                 }
                 
                 printLine('');
-                await printTypewriter('[*] Analyzing telemetry data...');
-                await sleep(500);
+                await printTypewriter('[*] Crunching forensic algorithms...');
+                await sleep(400);
                 
                 const varianceDL = (speedMbpsDL / expectedDL) * 100;
-                await printTypewriter(`[*] DL SLA Fulfillment: ${varianceDL.toFixed(2)}%`);
+                const throttlingScore = Math.max(0, Math.min(100, Math.round(100 - varianceDL)));
+                const ticketId = `#SLA-BRCH-${Math.floor(1000 + Math.random() * 9000)}`;
+
+                await printTypewriter(`[*] SLA Fulfillment Ratio: ${varianceDL.toFixed(2)}%`);
+                await printTypewriter(`[*] Calculated Throttling Index: ${throttlingScore} / 100`, throttlingScore > 50 ? 'color-red' : 'color-green');
                 printLine('');
 
-                // HACKER VERDICT & WHATSAPP DISPATCHER
+                // CYBERPUNK OVERRIDE VERDICT
                 await printTypewriter('====================================================', 'color-yellow');
-                await printTypewriter('[SYSTEM OVERRIDE: WHATSAPP FORENSIC DISPATCH READY]', 'color-cyan');
+                await printTypewriter(`[SYSTEM OVERRIDE: FORENSIC TICKET ${ticketId}]`, 'color-cyan');
                 await printTypewriter('====================================================', 'color-yellow');
                 
                 if (varianceDL < 50) {
-                    await printTypewriter(`[CRITICAL BREACH] Throttling terdeteksi! Hak SLA ${expectedDL} Mbps disunat menjadi ${speedMbpsDL.toFixed(2)} Mbps.`, 'color-red');
+                    await printTypewriter(`[CRITICAL BREACH] Throttling terdeteksi pada gateway ${ispOrg}! Hak bandwidth disunat paksa.`, 'color-red');
                 } else {
-                    await printTypewriter(`[STATUS NORMAL] Jaringan berjalan stabil sesuai baseline.`, 'color-green');
+                    await printTypewriter(`[STATUS NORMAL] Jalur transmisi beroperasi stabil.`, 'color-green');
                 }
 
                 printLine('');
-                await printTypewriter('--- GENERATING WHATSAPP DISPATCH PAYLOAD ---', 'color-gray');
+                await printTypewriter('--- GENERATING AUTOMATED NOC DISPATCH ---', 'color-gray');
                 
-                // Rakit teks laporan forensik (Update lengkap dengan Upload)
-                const reportText = `[LAPORAN FORENSIK JARINGAN]\n` +
-                                   `• IP: ${clientIP}\n` +
-                                   `• Lokasi Node: ${clientLoc}\n` +
-                                   `• ISP/ASN: ${ispOrg}\n` +
+                const reportText = `[CYBER-FORENSIC REPORT // ${ticketId}]\n` +
+                                   `• IP Client: ${clientIP}\n` +
+                                   `• Node Lokasi: ${clientLoc}\n` +
+                                   `• Provider: ${ispOrg}\n` +
+                                   `• Mode Gateway: ${serverMode.toUpperCase()}\n` +
                                    `• Target SLA: ${expectedDL} DL / ${expectedUL} UL Mbps\n` +
-                                   `• Hasil Download: ${speedMbpsDL.toFixed(2)} Mbps (${varianceDL.toFixed(2)}%)\n` +
-                                   `• Hasil Upload: ${speedMbpsUL.toFixed(2)} Mbps\n` +
-                                   `• Latency / Jitter: ${ping.toFixed(1)} ms / ${jitter.toFixed(1)} ms\n` +
-                                   `Mohon segera ditindaklanjuti karena terjadi penurunan performa drastis.`;
+                                   `• Hasil Aktual: DL ${speedMbpsDL.toFixed(2)} Mbps (${varianceDL.toFixed(2)}%) | UL ${speedMbpsUL.toFixed(2)} Mbps\n` +
+                                   `• Latency/Jitter: ${ping.toFixed(1)} ms / ${jitter.toFixed(1)} ms\n` +
+                                   `• Throttling Index: ${throttlingScore}/100\n` +
+                                   `Mohon investigasi dan hapus pembatasan bandwidth pada port saya segera.`;
 
-                await printTypewriter(reportText, 5, 'color-yellow');
+                await printTypewriter(reportText, 3, 'color-yellow');
                 printLine('');
 
-                // Bikin Tombol Interaktif Kirim ke WhatsApp (Nomor uji coba: 085350607184 -> 6285350607184)
+                // Tombol Eksekusi WhatsApp ke nomor uji 085350607184
                 const targetWhatsAppNumber = "6285350607184";
                 const encodedMessage = encodeURIComponent(reportText);
                 const waLink = `https://wa.me/${targetWhatsAppNumber}?text=${encodedMessage}`;
 
                 const btnLine = document.createElement('div');
                 btnLine.className = 'log-line';
-                btnLine.innerHTML = `[>] ACTION REQUIRED: <a href="${waLink}" target="_blank" class="wa-btn">[ KODE 085350607184: KIRIM LAPORAN KE WA ]</a>`;
+                btnLine.innerHTML = `[>] EXECUTE DISPATCH: <a href="${waLink}" target="_blank" class="wa-btn">[KIRIM LAPORAN KE WA: 085350607184]</a>`;
                 terminal.appendChild(btnLine);
                 
                 window.scrollTo(0, document.body.scrollHeight);
                 printLine('');
-                await printTypewriter('[*] Diagnostic & Dispatcher session terminated.');
+                await printTypewriter('[*] Autonomous Forensic Session Terminated.');
             };
 
             download.onerror = async function() {
-                await printTypewriter('[-] DOWNLOAD INGESTION FAILED. Connection interrupted.', 'color-red');
+                await printTypewriter('[-] DATA INGESTION FAILED. Gateway timeout.', 'color-red');
             };
 
-            download.src = targetURL + cacheBuster;
+            download.src = downloadTarget + "?cb=" + Math.random();
         }
 
         runDiagnostics();
