@@ -107,7 +107,7 @@
             window.scrollTo(0, document.body.scrollHeight);
         }
 
-        async function printTypewriter(text, delay = 20, colorClass = '') {
+        async function printTypewriter(text, delay = 15, colorClass = '') {
             const line = document.createElement('div');
             line.className = 'log-line ' + colorClass;
             terminal.appendChild(line);
@@ -179,7 +179,6 @@
             }
             
             let avgPing = pings.reduce((a, b) => a + b) / pings.length;
-            
             let jitter = 0;
             for(let i = 1; i < pings.length; i++) {
                 jitter += Math.abs(pings[i] - pings[i-1]);
@@ -209,25 +208,26 @@
         }
 
         async function runDiagnostics() {
-            await printTypewriter('Initializing Advanced Telemetry & SLA Validation Tool...');
+            await printTypewriter('Initializing Advanced Telemetry & SLA Validator...');
             await sleep(500);
             printLine('');
 
             await printTypewriter('[*] Fetching network topology...');
             await sleep(300);
             
+            let ispOrg = "Unknown";
             try {
                 const response = await fetch('https://ipapi.co/json/');
                 const data = await response.json();
                 await printTypewriter(`[+] IP Address: ${data.ip || 'Unknown'}`);
                 await printTypewriter(`[+] ISP/ASN: ${data.org || 'Unknown'} / ${data.asn || 'Unknown'}`);
                 await printTypewriter(`[+] Location: ${data.city || 'Unknown'}, ${data.region || 'Unknown'}, ${data.country_name || 'Unknown'}`);
+                ispOrg = data.org || "Unknown";
             } catch (e) {
                 await printTypewriter('[-] Network topology hidden by client security.', 'color-orange');
             }
             printLine('');
 
-            // INJEKSI URL PARAMETER
             const urlParams = new URLSearchParams(window.location.search);
             const urlDl = parseFloat(urlParams.get('dl'));
             const urlUl = parseFloat(urlParams.get('ul'));
@@ -240,7 +240,6 @@
                 expectedUL = urlUl;
                 await printTypewriter(`[*] Target SLA automatically injected via URL Protocol...`, 'color-yellow');
             } else {
-                // Fallback kalau link dibuka polosan tanpa parameter
                 while (true) {
                     const input = await promptInput('Enter target DOWNLOAD SLA (in Mbps): ');
                     const parsed = parseFloat(input);
@@ -284,11 +283,13 @@
                 await printTypewriter('[*] Initiating Upload Payload (Exfiltration)...');
                 const speedUL = await measureUpload();
                 
+                let speedMbpsUL = 0;
                 if (speedUL === null) {
                     await printTypewriter(`[-] Upload test blocked by strict client CORS policy.`, 'color-orange');
                 } else {
+                    speedMbpsUL = speedUL;
                     const speedMBpsUL = speedUL / 8;
-                    await printTypewriter(`[+] Upload Speed: ${speedUL.toFixed(2)} Mbps (${speedMBpsUL.toFixed(2)} MB/s)`);
+                    await printTypewriter(`[+] Upload Speed: ${speedMbpsUL.toFixed(2)} Mbps (${speedMBpsUL.toFixed(2)} MB/s)`);
                 }
                 
                 printLine('');
@@ -297,16 +298,25 @@
                 
                 const varianceDL = (speedMbpsDL / expectedDL) * 100;
                 await printTypewriter(`[*] DL SLA Fulfillment: ${varianceDL.toFixed(2)}%`);
+                printLine('');
+
+                // ==========================================
+                // HACKER VERDICT / KESIMPULAN BRUTAL OTOMATIS
+                // ==========================================
+                await printTypewriter('====================================================', 'color-yellow');
+                await printTypewriter('[SYSTEM OVERRIDE: TELEMETRY ANALYSIS COMPLETE]', 'color-red');
+                await printTypewriter('====================================================', 'color-yellow');
                 
                 if (varianceDL < 50) {
-                    await printTypewriter(`[CRITICAL] Severe Download degradation detected. ISP intervention required.`, 'color-red');
-                } else if (varianceDL >= 50 && varianceDL <= 75) {
-                    await printTypewriter(`[WARNING] Sub-optimal download performance.`, 'color-orange');
+                    await printTypewriter(`[CRITICAL BREACH] Infrastruktur ${ispOrg} terdeteksi BERMASALAH/JELEK.`, 'color-red');
+                    await printTypewriter(`-> Massive Downstream Throttling: Paket ${expectedDL} Mbps disunat paksa menjadi ${speedMbpsDL.toFixed(2)} Mbps (${varianceDL.toFixed(2)}% dari SLA).`, 'color-orange');
+                    await printTypewriter(`-> Routing Anomaly: Gateway terlempar jauh, menaikkan latensi dasar hingga ${ping.toFixed(1)} ms.`, 'color-orange');
+                    await printTypewriter(`-> Verdict: Jaringan lu kena shaping sepihak. Segera layangkan komplain resmi!`, 'color-red');
                 } else {
-                    await printTypewriter(`[OK] Download variance acceptable. Network operating normally.`, 'color-green');
+                    await printTypewriter(`[STATUS OPTIMAL] Jaringan beroperasi normal sesuai SLA.`, 'color-green');
                 }
                 
-                printLine('');
+                await printLine('');
                 await printTypewriter('[*] Diagnostic session terminated.');
             };
 
