@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Diagnostic & SLA Validation Tool</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #050505;
+            color: #00ff00;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        #terminal {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            line-height: 1.5;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
+        }
+
+        .log-line {
+            margin: 4px 0;
+            word-wrap: break-word;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background-color: #00ff00;
+            vertical-align: text-bottom;
+            animation: blink 1s step-end infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Custom Color Outputs */
+        .color-red {
+            color: #ff3333;
+            text-shadow: 0 0 5px rgba(255, 51, 51, 0.5);
+        }
+
+        .color-orange {
+            color: #ff9933;
+            text-shadow: 0 0 5px rgba(255, 153, 51, 0.5);
+        }
+
+        .color-yellow {
+            color: #ffff33;
+            text-shadow: 0 0 5px rgba(255, 255, 51, 0.5);
+        }
+
+        .color-green {
+            color: #00ff00;
+        }
+
+        /* Custom Scrollbar for stealth look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #000;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #004400;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ff00;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="terminal"></div>
+
+    <script>
+        const terminal = document.getElementById('terminal');
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        let activeInputPromise = null;
+        let inputBuffer = '';
+        let isWaitingForInput = false;
+
+        // Remove previous cursor
+        function removeCursor() {
+            const cursor = document.getElementById('cursor');
+            if (cursor) cursor.remove();
+        }
+
+        function appendCursor(container) {
+            removeCursor();
+            const cursorSpan = document.createElement('span');
+            cursorSpan.id = 'cursor';
+            cursorSpan.className = 'cursor';
+            container.appendChild(cursorSpan);
+        }
+
+        function printLine(text, colorClass = '') {
+            const line = document.createElement('div');
+            line.className = 'log-line ' + colorClass;
+            line.textContent = text;
+            terminal.appendChild(line);
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+
+        async function printTypewriter(text, delay = 20, colorClass = '') {
+            const line = document.createElement('div');
+            line.className = 'log-line ' + colorClass;
+            terminal.appendChild(line);
+
+            for (let i = 0; i < text.length; i++) {
+                line.textContent += text[i];
+                appendCursor(line);
+                await sleep(delay);
+            }
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+
+        async function promptInput(promptText) {
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            terminal.appendChild(line);
+
+            for (let i = 0; i < promptText.length; i++) {
+                line.textContent += promptText[i];
+                appendCursor(line);
+                await sleep(20);
+            }
+
+            const inputSpan = document.createElement('span');
+            line.appendChild(inputSpan);
+            appendCursor(line);
+            window.scrollTo(0, document.body.scrollHeight);
+
+            isWaitingForInput = true;
+            inputBuffer = '';
+
+            return new Promise((resolve) => {
+                activeInputPromise = { resolve, span: inputSpan, line: line };
+            });
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (!isWaitingForInput) return;
+
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (inputBuffer.trim() === '') return;
+                isWaitingForInput = false;
+                const val = inputBuffer;
+                inputBuffer = '';
+                removeCursor();
+                if (activeInputPromise) {
+                    activeInputPromise.resolve(val);
+                    activeInputPromise = null;
+                }
+                return;
+            }
+
+            if (event.key === 'Backspace') {
+                inputBuffer = inputBuffer.slice(0, -1);
+            } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                inputBuffer += event.key;
+            }
+
+            if (activeInputPromise) {
+                activeInputPromise.span.textContent = inputBuffer;
+                appendCursor(activeInputPromise.line);
+            }
+        });
+
+        async function runDiagnostics() {
+            await printTypewriter('Initializing Network Diagnostic & SLA Validation Tool...');
+            await sleep(500);
+            printLine('');
+
+            // Phase 1: Client-Side Environment Logging
+            await printTypewriter('[*] Fetching network topology...');
+            await sleep(300);
+
+            try {
+                const response = await fetch('https://ipapi.co/json/');
+                const data = await response.json();
+
+                await printTypewriter(`[+] IP Address: ${data.ip || 'Unknown'}`);
+                await printTypewriter(`[+] ISP/ASN: ${data.org || 'Unknown'} / ${data.asn || 'Unknown'}`);
+                await printTypewriter(`[+] Location: ${data.city || 'Unknown'}, ${data.region || 'Unknown'}, ${data.country_name || 'Unknown'}`);
+            } catch (e) {
+                await printTypewriter('[-] Network topology hidden by client security.', 'color-orange');
+            }
+
+            await printTypewriter(`[+] Browser Signature: ${navigator.userAgent}`);
+            printLine('');
+
+            // Phase 2: SLA Initialization
+            let expectedSLA = 0;
+            while (true) {
+                const input = await promptInput('Enter expected bandwidth SLA (in Mbps): ');
+                const parsed = parseFloat(input);
+                if (!isNaN(parsed) && parsed > 0) {
+                    expectedSLA = parsed;
+                    break;
+                } else {
+                    await printTypewriter('[-] Invalid input. Please enter a valid number greater than 0.', 'color-red');
+                    printLine('');
+                }
+            }
+
+            printLine('');
+            await printTypewriter(`[*] SLA Target accepted: ${expectedSLA} Mbps`);
+            await sleep(500);
+            printLine('');
+
+            // Phase 3: Unbiased Bandwidth Measurement
+            await printTypewriter('[*] Preparing unbiased bandwidth measurement...');
+            await sleep(300);
+
+            const targetURL = `https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg`;
+            const fileSizeBits = 5242880 * 8; // Exactly 5MB
+            const fileSizeMB = 5242880 / (1024 * 1024);
+
+            await printTypewriter('[*] Initiating payload transfer (DOM Image Ingestion)...');
+
+            const download = new Image();
+            const startTime = performance.now();
+            const cacheBuster = "?cb=" + Math.random();
+
+            download.onload = async function () {
+                const endTime = performance.now();
+                const durationSec = (endTime - startTime) / 1000;
+
+                await printTypewriter('[+] Payload transfer complete.');
+                printLine('');
+
+                // Phase 4: Diagnostic Output & Reporting
+                await printTypewriter('[*] Analyzing telemetrics...');
+                await sleep(500);
+
+                const speedMbps = (fileSizeBits / durationSec) / 1000000;
+                const speedMBps = fileSizeMB / durationSec;
+                const variance = (speedMbps / expectedSLA) * 100;
+
+                await printTypewriter(`[+] Transferred: 5.00 MB`);
+                await printTypewriter(`[+] Duration: ${durationSec.toFixed(2)} seconds`);
+                await printTypewriter(`[+] Raw Speed: ${speedMbps.toFixed(2)} Mbps (${speedMBps.toFixed(2)} MB/s)`);
+                printLine('');
+
+                await printTypewriter(`[*] SLA Validation: Measured ${speedMbps.toFixed(2)} Mbps vs Target ${expectedSLA} Mbps`);
+                await printTypewriter(`[*] SLA Fulfillment: ${variance.toFixed(2)}%`);
+
+                printLine('');
+                if (variance < 50) {
+                    await printTypewriter(`[CRITICAL] SLA Breach. Severe bandwidth degradation detected.`, 'color-red');
+                } else if (variance >= 50 && variance <= 75) {
+                    await printTypewriter(`[WARNING] Sub-optimal performance. High variance detected.`, 'color-orange');
+                } else if (variance > 75 && variance <= 90) {
+                    await printTypewriter(`[INFO] Acceptable variance within normal network loads.`, 'color-yellow');
+                } else {
+                    await printTypewriter(`[OK] Optimal. Network meets SLA standards.`, 'color-green');
+                }
+
+                printLine('');
+                await printTypewriter('[*] Diagnostic session terminated.');
+            };
+
+            download.onerror = async function () {
+                await printTypewriter('[-] INGESTION FAILED: Connection interrupted by client firewall or DNS timeout.', 'color-red');
+            };
+
+            download.src = targetURL + cacheBuster;
+        }
+
+        // Jalankan eksekusi
+        runDiagnostics();
+    </script>
+</body>
+
+</html>
