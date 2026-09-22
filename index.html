@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SLA Validator Core // Cyber-Forensic Edition</title>
+    <title>SLA Validator Core // Multi-Region & Stress Matrix</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -90,7 +90,7 @@
             terminal.appendChild(line);
             window.scrollTo(0, document.body.scrollHeight);
         }
-        async function printTypewriter(text, delay = 8, colorClass = '') {
+        async function printTypewriter(text, delay = 6, colorClass = '') {
             const line = document.createElement('div');
             line.className = 'log-line ' + colorClass;
             terminal.appendChild(line);
@@ -102,25 +102,70 @@
             window.scrollTo(0, document.body.scrollHeight);
         }
 
-        async function measurePingAndJitter(targetUrl) {
+        async function measureSinglePing(url) {
+            let start = performance.now();
+            return new Promise(resolve => {
+                let img = new Image();
+                let finished = false;
+                img.onload = () => { if(!finished) { finished = true; resolve(performance.now() - start); } };
+                img.onerror = () => { if(!finished) { finished = true; resolve(null); } }; // null menandakan packet loss/timeout
+                img.src = url + "?cb=" + Math.random() + Math.random();
+                setTimeout(() => { if(!finished) { finished = true; resolve(null); } }, 2000); // 2s timeout
+            });
+        }
+
+        async function runPacketLossStressTest() {
+            const totalProbes = 20; // Test selama 10 detik (1 probe tiap 500ms)
+            let successes = 0;
+            let failures = 0;
             let pings = [];
-            for (let i = 0; i < 5; i++) {
-                let start = performance.now();
-                await new Promise(resolve => {
-                    let img = new Image();
-                    img.onload = resolve;
-                    img.onerror = resolve; 
-                    img.src = targetUrl + "?cb=" + Math.random();
-                });
-                pings.push(performance.now() - start);
+
+            const testUrl = "https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif";
+
+            for (let i = 0; i < totalProbes; i++) {
+                let p = await measureSinglePing(testUrl);
+                if (p !== null) {
+                    successes++;
+                    pings.push(p);
+                } else {
+                    failures++;
+                }
+                await sleep(400);
             }
-            let avgPing = pings.reduce((a, b) => a + b, 0) / pings.length;
+
+            let lossPercentage = (failures / totalProbes) * 100;
+            let avgPing = pings.length > 0 ? pings.reduce((a, b) => a + b, 0) / pings.length : 999;
+            
             let jitter = 0;
-            for(let i = 1; i < pings.length; i++) {
-                jitter += Math.abs(pings[i] - pings[i-1]);
+            if (pings.length > 1) {
+                for(let i = 1; i < pings.length; i++) {
+                    jitter += Math.abs(pings[i] - pings[i-1]);
+                }
+                jitter = jitter / (pings.length - 1);
             }
-            jitter = jitter / (pings.length - 1);
-            return { ping: avgPing, jitter: jitter };
+
+            return { loss: lossPercentage, ping: avgPing, jitter: jitter, success: successes, total: totalProbes };
+        }
+
+        async function runMultiRegionMatrix() {
+            // Target multi-region CDN global & lokal
+            const regions = [
+                { name: "Local / ID Node", url: "https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif" },
+                { name: "Singapore Gateway", url: "https://www.cloudflare.com/favicon.ico" },
+                { name: "Tokyo Edge (JP)", url: "https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" }
+            ];
+
+            let results = [];
+            for (let reg of regions) {
+                let latencies = [];
+                for (let i = 0; i < 3; i++) {
+                    let t = await measureSinglePing(reg.url);
+                    if (t !== null) latencies.push(t);
+                }
+                let avg = latencies.length > 0 ? latencies.reduce((a,b)=>a+b,0)/latencies.length : 999;
+                results.push({ name: reg.name, latency: avg });
+            }
+            return results;
         }
 
         async function measureUpload() {
@@ -147,18 +192,17 @@
         }
 
         async function runDiagnostics() {
-            await printTypewriter('Initializing Cyber-Forensic Autonomous Suite v4.0...');
+            await printTypewriter('Initializing Cyber-Forensic Autonomous Suite v5.0 [STRESS & MATRIX]...');
             await sleep(300);
             printLine('');
 
-            // PARSE URL PARAMETERS
             const urlParams = new URLSearchParams(window.location.search);
             const urlDl = parseFloat(urlParams.get('dl'));
             const urlUl = parseFloat(urlParams.get('ul'));
-            const serverMode = urlParams.get('mode') || 'global'; // 'local' or 'global'
+            const serverMode = urlParams.get('mode') || 'global';
 
-            await printTypewriter(`[*] Target Execution Mode: [ ${serverMode.toUpperCase()} GATEWAY ]`, 'color-cyan');
-            await printTypewriter('[*] Intercepting network topology & routing descriptors...');
+            await printTypewriter(`[*] Active Gateway Mode: [ ${serverMode.toUpperCase()} ]`, 'color-cyan');
+            await printTypewriter('[*] Intercepting network node descriptors...');
             await sleep(300);
             
             let ispOrg = "Unknown";
@@ -172,10 +216,10 @@
                 clientLoc = `${data.city || 'Unknown'}, ${data.region || 'Unknown'}`;
 
                 await printTypewriter(`[+] Host IP: ${clientIP}`);
-                await printTypewriter(`[+] Target Autonomous ISP: ${ispOrg}`);
-                await printTypewriter(`[+] Node Region: ${clientLoc}`);
+                await printTypewriter(`[+] Target ISP: ${ispOrg}`);
+                await printTypewriter(`[+] Region Node: ${clientLoc}`);
             } catch (e) {
-                await printTypewriter('[-] Topology obfuscated by client firewall.', 'color-orange');
+                await printTypewriter('[-] Topology obfuscated.', 'color-orange');
             }
             printLine('');
 
@@ -185,10 +229,9 @@
             if (!isNaN(urlDl) && urlDl > 0 && !isNaN(urlUl) && urlUl > 0) {
                 expectedDL = urlDl;
                 expectedUL = urlUl;
-                await printTypewriter(`[*] SLA Target Injected via Protocol: ${expectedDL} DL / ${expectedUL} UL Mbps`, 'color-yellow');
+                await printTypewriter(`[*] SLA Target Injected: ${expectedDL} DL / ${expectedUL} UL Mbps`, 'color-yellow');
             } else {
-                await printTypewriter(`[*] Zero-Config Mode: Executing Neural Baseline Calibration...`, 'color-yellow');
-                
+                await printTypewriter(`[*] Zero-Config Mode: Running Neural Calibration...`, 'color-yellow');
                 const calibrationURL = "https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg";
                 const fileSizeBits = 5242880 * 8;
                 const startCalib = performance.now();
@@ -205,26 +248,31 @@
                 
                 expectedDL = snapToStandardTier(rawCalibSpeed);
                 expectedUL = Math.round(expectedDL * 0.5);
-                
-                await printTypewriter(`[+] Baseline Locked: ~${rawCalibSpeed.toFixed(2)} Mbps -> Mapped Tier: ${expectedDL} Mbps`, 'color-green');
+                await printTypewriter(`[+] Baseline Locked: ~${rawCalibSpeed.toFixed(2)} Mbps -> Tier: ${expectedDL} Mbps`, 'color-green');
             }
             
             printLine('');
-            await printTypewriter(`[*] Reference Threshold Locked: ${expectedDL} DL / ${expectedUL} UL Mbps`);
+            await printTypewriter(`[*] Threshold Reference: ${expectedDL} DL / ${expectedUL} UL Mbps`);
             await sleep(300);
             printLine('');
 
-            // Tentukan target probe berdasarkan mode (local/global)
-            let pingTarget = "https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif";
-            let downloadTarget = "https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg";
-
-            await printTypewriter(`[*] Executing Micro-Probes on [${serverMode.toUpperCase()}] infrastructure...`);
-            const { ping, jitter } = await measurePingAndJitter(pingTarget);
-            await printTypewriter(`[+] Core Latency: ${ping.toFixed(1)} ms`);
-            await printTypewriter(`[+] Signal Jitter: ${jitter.toFixed(1)} ms`);
+            // MODUL 1: MULTI-REGION LATENCY MATRIX
+            await printTypewriter('[*] Executing Multi-Region CDN Latency Matrix...');
+            let matrixResults = await runMultiRegionMatrix();
+            matrixResults.forEach(res => {
+                printTypewriter(`    > [ ${res.name} ] -> Latency: ${res.latency === 999 ? 'TIMEOUT' : res.latency.toFixed(1) + ' ms'}`, 5, 'color-cyan');
+            });
             printLine('');
 
-            await printTypewriter('[*] Ingesting High-Density Data Payload...');
+            // MODUL 2: 10-SECOND PACKET LOSS STRESS TEST
+            await printTypewriter('[*] Executing 10-Second Packet Loss Stress Test (20 Probes)...');
+            const stressResult = await runPacketLossStressTest();
+            await printTypewriter(`[+] Average Ping (Stress): ${stressResult.ping.toFixed(1)} ms`);
+            await printTypewriter(`[+] Signal Jitter: ${stressResult.jitter.toFixed(1)} ms`);
+            await printTypewriter(`[+] Packet Loss Ratio: ${stressResult.loss.toFixed(1)}% (${stressResult.failures}/${stressResult.total} dropped)`, stressResult.loss > 0 ? 'color-red' : 'color-green');
+            printLine('');
+
+            await printTypewriter('[*] Ingesting High-Density Download Payload...');
             const fileSizeBits = 5242880 * 8; 
             const download = new Image();
             const startDL = performance.now();
@@ -250,7 +298,8 @@
                 await sleep(400);
                 
                 const varianceDL = (speedMbpsDL / expectedDL) * 100;
-                const throttlingScore = Math.max(0, Math.min(100, Math.round(100 - varianceDL)));
+                // Indikator dosa ISP memperhitungkan packet loss juga
+                const throttlingScore = Math.max(0, Math.min(100, Math.round((100 - varianceDL) + (stressResult.loss * 2))));
                 const ticketId = `#SLA-BRCH-${Math.floor(1000 + Math.random() * 9000)}`;
 
                 await printTypewriter(`[*] SLA Fulfillment Ratio: ${varianceDL.toFixed(2)}%`);
@@ -259,28 +308,32 @@
 
                 // CYBERPUNK OVERRIDE VERDICT
                 await printTypewriter('====================================================', 'color-yellow');
-                await printTypewriter(`[SYSTEM OVERRIDE: FORENSIC TICKET ${ticketId}]`, 'color-cyan');
+                await printTypewriter(`[SYSTEM OVERRIDE: STRESSED FORENSIC TICKET ${ticketId}]`, 'color-cyan');
                 await printTypewriter('====================================================', 'color-yellow');
                 
-                if (varianceDL < 50) {
-                    await printTypewriter(`[CRITICAL BREACH] Throttling terdeteksi pada gateway ${ispOrg}! Hak bandwidth disunat paksa.`, 'color-red');
+                if (varianceDL < 50 || stressResult.loss > 0) {
+                    await printTypewriter(`[CRITICAL BREACH] Anomali & Packet Loss terdeteksi pada jaringan ${ispOrg}!`, 'color-red');
                 } else {
-                    await printTypewriter(`[STATUS NORMAL] Jalur transmisi beroperasi stabil.`, 'color-green');
+                    await printTypewriter(`[STATUS NORMAL] Jalur transmisi stabil tanpa degradasi berarti.`, 'color-green');
                 }
 
                 printLine('');
-                await printTypewriter('--- GENERATING AUTOMATED NOC DISPATCH ---', 'color-gray');
+                await printTypewriter('--- GENERATING ADVANCED NOC DISPATCH ---', 'color-gray');
                 
-                const reportText = `[CYBER-FORENSIC REPORT // ${ticketId}]\n` +
+                // Rangkuman Matrix Latency untuk teks WA
+                let matrixStr = matrixResults.map(r => `${r.name}: ${r.latency === 999 ? 'TIMEOUT' : r.latency.toFixed(1) + 'ms'}`).join(' | ');
+
+                const reportText = `[CYBER-FORENSIC STRESS REPORT // ${ticketId}]\n` +
                                    `• IP Client: ${clientIP}\n` +
                                    `• Node Lokasi: ${clientLoc}\n` +
                                    `• Provider: ${ispOrg}\n` +
                                    `• Mode Gateway: ${serverMode.toUpperCase()}\n` +
                                    `• Target SLA: ${expectedDL} DL / ${expectedUL} UL Mbps\n` +
                                    `• Hasil Aktual: DL ${speedMbpsDL.toFixed(2)} Mbps (${varianceDL.toFixed(2)}%) | UL ${speedMbpsUL.toFixed(2)} Mbps\n` +
-                                   `• Latency/Jitter: ${ping.toFixed(1)} ms / ${jitter.toFixed(1)} ms\n` +
+                                   `• Stress Packet Loss: ${stressResult.loss.toFixed(1)}% (${stressResult.failures} dropped)\n` +
+                                   `• Latency Matrix: [${matrixStr}]\n` +
                                    `• Throttling Index: ${throttlingScore}/100\n` +
-                                   `Mohon investigasi dan hapus pembatasan bandwidth pada port saya segera.`;
+                                   `Mohon investigasi dan hapus pembatasan bandwidth serta packet loss pada port saya segera.`;
 
                 await printTypewriter(reportText, 3, 'color-yellow');
                 printLine('');
@@ -292,19 +345,19 @@
 
                 const btnLine = document.createElement('div');
                 btnLine.className = 'log-line';
-                btnLine.innerHTML = `[>] EXECUTE DISPATCH: <a href="${waLink}" target="_blank" class="wa-btn">[KIRIM LAPORAN KE WA: 085350607184]</a>`;
+                btnLine.innerHTML = `[>] EXECUTE DISPATCH: <a href="${waLink}" target="_blank" class="wa-btn">[KIRIM LAPORAN STRESS TEST KE WA: 085350607184]</a>`;
                 terminal.appendChild(btnLine);
                 
                 window.scrollTo(0, document.body.scrollHeight);
                 printLine('');
-                await printTypewriter('[*] Autonomous Forensic Session Terminated.');
+                await printTypewriter('[*] Advanced Stress Diagnostic Session Terminated.');
             };
 
             download.onerror = async function() {
                 await printTypewriter('[-] DATA INGESTION FAILED. Gateway timeout.', 'color-red');
             };
 
-            download.src = downloadTarget + "?cb=" + Math.random();
+            download.src = "https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg" + "?cb=" + Math.random();
         }
 
         runDiagnostics();
