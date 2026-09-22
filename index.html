@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SLA Validator Core // Balanced Forensic Edition</title>
+    <title>SLA Validator Core // Dual-Unit Edition (Mbps & MB/s)</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -115,7 +115,7 @@
         }
 
         async function runPacketLossStressTest() {
-            const totalProbes = 10; // Dipangkas jadi 10 probe agar lebih cepat & fokus ke inti
+            const totalProbes = 10;
             let successes = 0;
             let failures = 0;
             let pings = [];
@@ -170,7 +170,7 @@
         }
 
         async function runDiagnostics() {
-            await printTypewriter('SLA Validator Core // Balanced Mode Initialized...');
+            await printTypewriter('SLA Validator Core // Dual-Unit Mode (Mbps & MB/s) Initialized...');
             await sleep(300);
             printLine('');
 
@@ -192,7 +192,7 @@
                 clientLoc = `${data.city || 'Unknown'}, ${data.region || 'Unknown'}`;
                 await printTypewriter(`[+] Target ISP: ${ispOrg} (${clientLoc})`);
             } catch (e) {
-                await printTypewriter('[-] Topology hidden.', 'color-orange');
+                printLine('[-] Topology hidden.', 'color-orange');
             }
             printLine('');
 
@@ -202,7 +202,7 @@
             if (!isNaN(urlDl) && urlDl > 0 && !isNaN(urlUl) && urlUl > 0) {
                 expectedDL = urlDl;
                 expectedUL = urlUl;
-                await printTypewriter(`[*] Target SLA Injected: ${expectedDL} DL / ${expectedUL} UL Mbps`, 'color-yellow');
+                await printTypewriter(`[*] Target SLA Injected: ${expectedDL} Mbps / ${(expectedDL/8).toFixed(2)} MB/s`, 'color-yellow');
             } else {
                 await printTypewriter(`[*] Auto-Calibrating Baseline Speed...`, 'color-yellow');
                 const calibrationURL = "https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg";
@@ -221,16 +221,16 @@
                 
                 expectedDL = snapToStandardTier(rawCalibSpeed);
                 expectedUL = Math.round(expectedDL * 0.5);
-                await printTypewriter(`[+] Baseline Locked: ~${rawCalibSpeed.toFixed(2)} Mbps -> Mapped SLA Tier: ${expectedDL} Mbps`, 'color-green');
+                await printTypewriter(`[+] Baseline Locked: ~${rawCalibSpeed.toFixed(2)} Mbps (~${(rawCalibSpeed/8).toFixed(2)} MB/s) -> Tier: ${expectedDL} Mbps`, 'color-green');
             }
             
             printLine('');
             await printTypewriter(`====================================================`);
-            await printTypewriter(`[+] CORE SLA TARGET: ${expectedDL} Mbps Download`, 'color-yellow');
+            await printTypewriter(`[+] CORE SLA TARGET: ${expectedDL} Mbps (${(expectedDL/8).toFixed(2)} MB/s)`, 'color-yellow');
             await printTypewriter(`====================================================`);
             printLine('');
 
-            // 1. UTAMA: TEST DOWNLOAD & UPLOAD (Fokus Pengujian Kecepatan)
+            // DOWNLOAD TEST
             await printTypewriter('[*] Executing Core Download Speed Test...');
             const targetURL = `https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg`;
             const fileSizeBits = 5242880 * 8; 
@@ -240,20 +240,24 @@
             download.onload = async function() {
                 const durationSecDL = (performance.now() - startDL) / 1000;
                 const speedMbpsDL = (fileSizeBits / durationSecDL) / 1000000;
+                const speedMBpsDL = speedMbpsDL / 8; // Konversi ke Megabyte per second ala Ookla
                 
-                await printTypewriter(`[+] Download Speed Result: ${speedMbpsDL.toFixed(2)} Mbps`, 'color-green');
+                await printTypewriter(`[+] Download Result: ${speedMbpsDL.toFixed(2)} Mbps (${speedMBpsDL.toFixed(2)} MB/s)`, 'color-green');
                 
+                // UPLOAD TEST
                 await printTypewriter('[*] Executing Core Upload Speed Test...');
                 const speedUL = await measureUpload();
                 let speedMbpsUL = speedUL !== null ? speedUL : 0;
+                let speedMBpsUL = speedMbpsUL / 8;
+                
                 if (speedUL !== null) {
-                    await printTypewriter(`[+] Upload Speed Result: ${speedMbpsUL.toFixed(2)} Mbps`, 'color-green');
+                    await printTypewriter(`[+] Upload Result: ${speedMbpsUL.toFixed(2)} Mbps (${speedMBpsUL.toFixed(2)} MB/s)`, 'color-green');
                 } else {
-                    await printTypewriter(`[-] Upload test restricted.`, 'color-orange');
+                    printTypewriter(`[-] Upload test restricted.`, 'color-orange');
                 }
                 printLine('');
 
-                // 2. PENDUKUNG: LATENCY MATRIX & PACKET LOSS STRESS TEST
+                // SUPPORTING DIAGNOSTICS
                 await printTypewriter('[*] Running Supporting Diagnostics (Latency & Packet Loss)...');
                 let matrixResults = await runMultiRegionMatrix();
                 let stressResult = await runPacketLossStressTest();
@@ -264,7 +268,7 @@
                 await printTypewriter(`    > Stress Packet Loss: ${stressResult.loss.toFixed(1)}% (${stressResult.failures} dropped)`, stressResult.loss > 0 ? 'color-red' : 'color-green');
                 printLine('');
 
-                // ANALISIS AKHIR
+                // VERDICT & REPORT
                 const varianceDL = (speedMbpsDL / expectedDL) * 100;
                 const ticketId = `#SLA-BRCH-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -273,9 +277,9 @@
                 await printTypewriter('====================================================', 'color-yellow');
                 
                 if (varianceDL < 50) {
-                    await printTypewriter(`[CRITICAL BREACH] Kecepatan Download disunat! Target ${expectedDL} Mbps hanya tembus ${speedMbpsDL.toFixed(2)} Mbps (${varianceDL.toFixed(2)}%).`, 'color-red');
+                    await printTypewriter(`[CRITICAL BREACH] Kecepatan Download disunat! Target ${expectedDL} Mbps (${(expectedDL/8).toFixed(2)} MB/s) hanya tembus ${speedMbpsDL.toFixed(2)} Mbps (${speedMBpsDL.toFixed(2)} MB/s).`, 'color-red');
                 } else {
-                    await printTypewriter(`[STATUS OPTIMAL] Kecepatan Download sesuai target SLA (${varianceDL.toFixed(2)}%).`, 'color-green');
+                    await printTypewriter(`[STATUS OPTIMAL] Kecepatan Download sesuai target SLA.`, 'color-green');
                 }
 
                 printLine('');
@@ -284,8 +288,8 @@
                 const reportText = `[LAPORAN FORENSIK SLA // ${ticketId}]\n` +
                                    `• IP Client: ${clientIP}\n` +
                                    `• Provider: ${ispOrg}\n` +
-                                   `• Target SLA: ${expectedDL} Mbps Download\n` +
-                                   `• Hasil Aktual: DL ${speedMbpsDL.toFixed(2)} Mbps (${varianceDL.toFixed(2)}%) | UL ${speedMbpsUL.toFixed(2)} Mbps\n` +
+                                   `• Target SLA: ${expectedDL} Mbps (${(expectedDL/8).toFixed(2)} MB/s)\n` +
+                                   `• Hasil Aktual: DL ${speedMbpsDL.toFixed(2)} Mbps (${speedMBpsDL.toFixed(2)} MB/s) | UL ${speedMbpsUL.toFixed(2)} Mbps (${speedMBpsUL.toFixed(2)} MB/s)\n` +
                                    `• Packet Loss: ${stressResult.loss.toFixed(1)}%\n` +
                                    `Mohon dicek kembali port bandwidth langganan saya karena terjadi penurunan performa.`;
 
@@ -304,7 +308,7 @@
                 window.scrollTo(0, document.body.scrollHeight);
             };
 
-            download.onerror = async function() {
+            download.onerror = function() {
                 printTypewriter('[-] DOWNLOAD FAILED. Connection timeout.', 'color-red');
             };
 
