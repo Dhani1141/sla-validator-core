@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SLA Validator Core // Multi-Region & Stress Matrix</title>
+    <title>SLA Validator Core // Balanced Forensic Edition</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -90,7 +90,7 @@
             terminal.appendChild(line);
             window.scrollTo(0, document.body.scrollHeight);
         }
-        async function printTypewriter(text, delay = 6, colorClass = '') {
+        async function printTypewriter(text, delay = 5, colorClass = '') {
             const line = document.createElement('div');
             line.className = 'log-line ' + colorClass;
             terminal.appendChild(line);
@@ -108,62 +108,40 @@
                 let img = new Image();
                 let finished = false;
                 img.onload = () => { if(!finished) { finished = true; resolve(performance.now() - start); } };
-                img.onerror = () => { if(!finished) { finished = true; resolve(null); } }; // null menandakan packet loss/timeout
+                img.onerror = () => { if(!finished) { finished = true; resolve(null); } };
                 img.src = url + "?cb=" + Math.random() + Math.random();
-                setTimeout(() => { if(!finished) { finished = true; resolve(null); } }, 2000); // 2s timeout
+                setTimeout(() => { if(!finished) { finished = true; resolve(null); } }, 2000);
             });
         }
 
         async function runPacketLossStressTest() {
-            const totalProbes = 20; // Test selama 10 detik (1 probe tiap 500ms)
+            const totalProbes = 10; // Dipangkas jadi 10 probe agar lebih cepat & fokus ke inti
             let successes = 0;
             let failures = 0;
             let pings = [];
-
             const testUrl = "https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif";
 
             for (let i = 0; i < totalProbes; i++) {
                 let p = await measureSinglePing(testUrl);
-                if (p !== null) {
-                    successes++;
-                    pings.push(p);
-                } else {
-                    failures++;
-                }
-                await sleep(400);
+                if (p !== null) { successes++; pings.push(p); } else { failures++; }
+                await sleep(300);
             }
 
             let lossPercentage = (failures / totalProbes) * 100;
             let avgPing = pings.length > 0 ? pings.reduce((a, b) => a + b, 0) / pings.length : 999;
-            
-            let jitter = 0;
-            if (pings.length > 1) {
-                for(let i = 1; i < pings.length; i++) {
-                    jitter += Math.abs(pings[i] - pings[i-1]);
-                }
-                jitter = jitter / (pings.length - 1);
-            }
-
-            return { loss: lossPercentage, ping: avgPing, jitter: jitter, success: successes, total: totalProbes };
+            return { loss: lossPercentage, ping: avgPing, failures: failures, total: totalProbes };
         }
 
         async function runMultiRegionMatrix() {
-            // Target multi-region CDN global & lokal
             const regions = [
-                { name: "Local / ID Node", url: "https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif" },
-                { name: "Singapore Gateway", url: "https://www.cloudflare.com/favicon.ico" },
-                { name: "Tokyo Edge (JP)", url: "https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" }
+                { name: "Local ID", url: "https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif" },
+                { name: "Singapore", url: "https://www.cloudflare.com/favicon.ico" }
             ];
 
             let results = [];
             for (let reg of regions) {
-                let latencies = [];
-                for (let i = 0; i < 3; i++) {
-                    let t = await measureSinglePing(reg.url);
-                    if (t !== null) latencies.push(t);
-                }
-                let avg = latencies.length > 0 ? latencies.reduce((a,b)=>a+b,0)/latencies.length : 999;
-                results.push({ name: reg.name, latency: avg });
+                let t = await measureSinglePing(reg.url);
+                results.push({ name: reg.name, latency: t });
             }
             return results;
         }
@@ -181,7 +159,7 @@
         }
 
         function snapToStandardTier(rawSpeed) {
-            const tiers = [10, 20, 30, 50, 75, 100, 150, 200, 300];
+            const tiers = [10, 20, 30, 50, 75, 100];
             let closest = tiers[0];
             let minDiff = Math.abs(rawSpeed - closest);
             for (let i = 1; i < tiers.length; i++) {
@@ -192,7 +170,7 @@
         }
 
         async function runDiagnostics() {
-            await printTypewriter('Initializing Cyber-Forensic Autonomous Suite v5.0 [STRESS & MATRIX]...');
+            await printTypewriter('SLA Validator Core // Balanced Mode Initialized...');
             await sleep(300);
             printLine('');
 
@@ -201,9 +179,7 @@
             const urlUl = parseFloat(urlParams.get('ul'));
             const serverMode = urlParams.get('mode') || 'global';
 
-            await printTypewriter(`[*] Active Gateway Mode: [ ${serverMode.toUpperCase()} ]`, 'color-cyan');
-            await printTypewriter('[*] Intercepting network node descriptors...');
-            await sleep(300);
+            await printTypewriter(`[*] Gateway Mode: [ ${serverMode.toUpperCase()} ]`, 'color-cyan');
             
             let ispOrg = "Unknown";
             let clientIP = "Unknown";
@@ -214,12 +190,9 @@
                 clientIP = data.ip || 'Unknown';
                 ispOrg = `${data.org || 'Unknown'} / ${data.asn || 'Unknown'}`;
                 clientLoc = `${data.city || 'Unknown'}, ${data.region || 'Unknown'}`;
-
-                await printTypewriter(`[+] Host IP: ${clientIP}`);
-                await printTypewriter(`[+] Target ISP: ${ispOrg}`);
-                await printTypewriter(`[+] Region Node: ${clientLoc}`);
+                await printTypewriter(`[+] Target ISP: ${ispOrg} (${clientLoc})`);
             } catch (e) {
-                await printTypewriter('[-] Topology obfuscated.', 'color-orange');
+                await printTypewriter('[-] Topology hidden.', 'color-orange');
             }
             printLine('');
 
@@ -229,9 +202,9 @@
             if (!isNaN(urlDl) && urlDl > 0 && !isNaN(urlUl) && urlUl > 0) {
                 expectedDL = urlDl;
                 expectedUL = urlUl;
-                await printTypewriter(`[*] SLA Target Injected: ${expectedDL} DL / ${expectedUL} UL Mbps`, 'color-yellow');
+                await printTypewriter(`[*] Target SLA Injected: ${expectedDL} DL / ${expectedUL} UL Mbps`, 'color-yellow');
             } else {
-                await printTypewriter(`[*] Zero-Config Mode: Running Neural Calibration...`, 'color-yellow');
+                await printTypewriter(`[*] Auto-Calibrating Baseline Speed...`, 'color-yellow');
                 const calibrationURL = "https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg";
                 const fileSizeBits = 5242880 * 8;
                 const startCalib = performance.now();
@@ -248,31 +221,18 @@
                 
                 expectedDL = snapToStandardTier(rawCalibSpeed);
                 expectedUL = Math.round(expectedDL * 0.5);
-                await printTypewriter(`[+] Baseline Locked: ~${rawCalibSpeed.toFixed(2)} Mbps -> Tier: ${expectedDL} Mbps`, 'color-green');
+                await printTypewriter(`[+] Baseline Locked: ~${rawCalibSpeed.toFixed(2)} Mbps -> Mapped SLA Tier: ${expectedDL} Mbps`, 'color-green');
             }
             
             printLine('');
-            await printTypewriter(`[*] Threshold Reference: ${expectedDL} DL / ${expectedUL} UL Mbps`);
-            await sleep(300);
+            await printTypewriter(`====================================================`);
+            await printTypewriter(`[+] CORE SLA TARGET: ${expectedDL} Mbps Download`, 'color-yellow');
+            await printTypewriter(`====================================================`);
             printLine('');
 
-            // MODUL 1: MULTI-REGION LATENCY MATRIX
-            await printTypewriter('[*] Executing Multi-Region CDN Latency Matrix...');
-            let matrixResults = await runMultiRegionMatrix();
-            matrixResults.forEach(res => {
-                printTypewriter(`    > [ ${res.name} ] -> Latency: ${res.latency === 999 ? 'TIMEOUT' : res.latency.toFixed(1) + ' ms'}`, 5, 'color-cyan');
-            });
-            printLine('');
-
-            // MODUL 2: 10-SECOND PACKET LOSS STRESS TEST
-            await printTypewriter('[*] Executing 10-Second Packet Loss Stress Test (20 Probes)...');
-            const stressResult = await runPacketLossStressTest();
-            await printTypewriter(`[+] Average Ping (Stress): ${stressResult.ping.toFixed(1)} ms`);
-            await printTypewriter(`[+] Signal Jitter: ${stressResult.jitter.toFixed(1)} ms`);
-            await printTypewriter(`[+] Packet Loss Ratio: ${stressResult.loss.toFixed(1)}% (${stressResult.failures}/${stressResult.total} dropped)`, stressResult.loss > 0 ? 'color-red' : 'color-green');
-            printLine('');
-
-            await printTypewriter('[*] Ingesting High-Density Download Payload...');
+            // 1. UTAMA: TEST DOWNLOAD & UPLOAD (Fokus Pengujian Kecepatan)
+            await printTypewriter('[*] Executing Core Download Speed Test...');
+            const targetURL = `https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg`;
             const fileSizeBits = 5242880 * 8; 
             const download = new Image();
             const startDL = performance.now();
@@ -281,83 +241,74 @@
                 const durationSecDL = (performance.now() - startDL) / 1000;
                 const speedMbpsDL = (fileSizeBits / durationSecDL) / 1000000;
                 
-                await printTypewriter(`[+] Download Throughput: ${speedMbpsDL.toFixed(2)} Mbps`);
-                printLine('');
+                await printTypewriter(`[+] Download Speed Result: ${speedMbpsDL.toFixed(2)} Mbps`, 'color-green');
                 
-                await printTypewriter('[*] Exfiltrating Test Upload Payload...');
+                await printTypewriter('[*] Executing Core Upload Speed Test...');
                 const speedUL = await measureUpload();
                 let speedMbpsUL = speedUL !== null ? speedUL : 0;
                 if (speedUL !== null) {
-                    await printTypewriter(`[+] Upload Throughput: ${speedMbpsUL.toFixed(2)} Mbps`);
+                    await printTypewriter(`[+] Upload Speed Result: ${speedMbpsUL.toFixed(2)} Mbps`, 'color-green');
                 } else {
-                    await printTypewriter(`[-] Upload restricted by policy.`, 'color-orange');
+                    await printTypewriter(`[-] Upload test restricted.`, 'color-orange');
                 }
-                
                 printLine('');
-                await printTypewriter('[*] Crunching forensic algorithms...');
-                await sleep(400);
-                
+
+                // 2. PENDUKUNG: LATENCY MATRIX & PACKET LOSS STRESS TEST
+                await printTypewriter('[*] Running Supporting Diagnostics (Latency & Packet Loss)...');
+                let matrixResults = await runMultiRegionMatrix();
+                let stressResult = await runPacketLossStressTest();
+
+                matrixResults.forEach(res => {
+                    printTypewriter(`    > Ping ${res.name}: ${res.latency === null ? 'TIMEOUT' : res.latency.toFixed(1) + ' ms'}`, 3, 'color-cyan');
+                });
+                await printTypewriter(`    > Stress Packet Loss: ${stressResult.loss.toFixed(1)}% (${stressResult.failures} dropped)`, stressResult.loss > 0 ? 'color-red' : 'color-green');
+                printLine('');
+
+                // ANALISIS AKHIR
                 const varianceDL = (speedMbpsDL / expectedDL) * 100;
-                // Indikator dosa ISP memperhitungkan packet loss juga
-                const throttlingScore = Math.max(0, Math.min(100, Math.round((100 - varianceDL) + (stressResult.loss * 2))));
                 const ticketId = `#SLA-BRCH-${Math.floor(1000 + Math.random() * 9000)}`;
 
-                await printTypewriter(`[*] SLA Fulfillment Ratio: ${varianceDL.toFixed(2)}%`);
-                await printTypewriter(`[*] Calculated Throttling Index: ${throttlingScore} / 100`, throttlingScore > 50 ? 'color-red' : 'color-green');
-                printLine('');
-
-                // CYBERPUNK OVERRIDE VERDICT
                 await printTypewriter('====================================================', 'color-yellow');
-                await printTypewriter(`[SYSTEM OVERRIDE: STRESSED FORENSIC TICKET ${ticketId}]`, 'color-cyan');
+                await printTypewriter(`[CORE VERDICT: TICKET ${ticketId}]`, 'color-cyan');
                 await printTypewriter('====================================================', 'color-yellow');
                 
-                if (varianceDL < 50 || stressResult.loss > 0) {
-                    await printTypewriter(`[CRITICAL BREACH] Anomali & Packet Loss terdeteksi pada jaringan ${ispOrg}!`, 'color-red');
+                if (varianceDL < 50) {
+                    await printTypewriter(`[CRITICAL BREACH] Kecepatan Download disunat! Target ${expectedDL} Mbps hanya tembus ${speedMbpsDL.toFixed(2)} Mbps (${varianceDL.toFixed(2)}%).`, 'color-red');
                 } else {
-                    await printTypewriter(`[STATUS NORMAL] Jalur transmisi stabil tanpa degradasi berarti.`, 'color-green');
+                    await printTypewriter(`[STATUS OPTIMAL] Kecepatan Download sesuai target SLA (${varianceDL.toFixed(2)}%).`, 'color-green');
                 }
 
                 printLine('');
-                await printTypewriter('--- GENERATING ADVANCED NOC DISPATCH ---', 'color-gray');
+                await printTypewriter('--- WHATSAPP NOC PAYLOAD READY ---', 'color-gray');
                 
-                // Rangkuman Matrix Latency untuk teks WA
-                let matrixStr = matrixResults.map(r => `${r.name}: ${r.latency === 999 ? 'TIMEOUT' : r.latency.toFixed(1) + 'ms'}`).join(' | ');
-
-                const reportText = `[CYBER-FORENSIC STRESS REPORT // ${ticketId}]\n` +
+                const reportText = `[LAPORAN FORENSIK SLA // ${ticketId}]\n` +
                                    `• IP Client: ${clientIP}\n` +
-                                   `• Node Lokasi: ${clientLoc}\n` +
                                    `• Provider: ${ispOrg}\n` +
-                                   `• Mode Gateway: ${serverMode.toUpperCase()}\n` +
-                                   `• Target SLA: ${expectedDL} DL / ${expectedUL} UL Mbps\n` +
+                                   `• Target SLA: ${expectedDL} Mbps Download\n` +
                                    `• Hasil Aktual: DL ${speedMbpsDL.toFixed(2)} Mbps (${varianceDL.toFixed(2)}%) | UL ${speedMbpsUL.toFixed(2)} Mbps\n` +
-                                   `• Stress Packet Loss: ${stressResult.loss.toFixed(1)}% (${stressResult.failures} dropped)\n` +
-                                   `• Latency Matrix: [${matrixStr}]\n` +
-                                   `• Throttling Index: ${throttlingScore}/100\n` +
-                                   `Mohon investigasi dan hapus pembatasan bandwidth serta packet loss pada port saya segera.`;
+                                   `• Packet Loss: ${stressResult.loss.toFixed(1)}%\n` +
+                                   `Mohon dicek kembali port bandwidth langganan saya karena terjadi penurunan performa.`;
 
-                await printTypewriter(reportText, 3, 'color-yellow');
+                await printTypewriter(reportText, 2, 'color-yellow');
                 printLine('');
 
-                // Tombol Eksekusi WhatsApp ke nomor uji 085350607184
                 const targetWhatsAppNumber = "6285350607184";
                 const encodedMessage = encodeURIComponent(reportText);
                 const waLink = `https://wa.me/${targetWhatsAppNumber}?text=${encodedMessage}`;
 
                 const btnLine = document.createElement('div');
                 btnLine.className = 'log-line';
-                btnLine.innerHTML = `[>] EXECUTE DISPATCH: <a href="${waLink}" target="_blank" class="wa-btn">[KIRIM LAPORAN STRESS TEST KE WA: 085350607184]</a>`;
+                btnLine.innerHTML = `[>] DISPATCH: <a href="${waLink}" target="_blank" class="wa-btn">[KIRIM LAPORAN KE WA: 085350607184]</a>`;
                 terminal.appendChild(btnLine);
                 
                 window.scrollTo(0, document.body.scrollHeight);
-                printLine('');
-                await printTypewriter('[*] Advanced Stress Diagnostic Session Terminated.');
             };
 
             download.onerror = async function() {
-                await printTypewriter('[-] DATA INGESTION FAILED. Gateway timeout.', 'color-red');
+                printTypewriter('[-] DOWNLOAD FAILED. Connection timeout.', 'color-red');
             };
 
-            download.src = "https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg" + "?cb=" + Math.random();
+            download.src = targetURL + "?cb=" + Math.random();
         }
 
         runDiagnostics();
