@@ -221,25 +221,36 @@
                 const data = await response.json();
                 await printTypewriter(`[+] IP Address: ${data.ip || 'Unknown'}`);
                 await printTypewriter(`[+] ISP/ASN: ${data.org || 'Unknown'} / ${data.asn || 'Unknown'}`);
-                // BUG LOKASI FIXED: Baris ini udah gua balikin
                 await printTypewriter(`[+] Location: ${data.city || 'Unknown'}, ${data.region || 'Unknown'}, ${data.country_name || 'Unknown'}`);
             } catch (e) {
                 await printTypewriter('[-] Network topology hidden by client security.', 'color-orange');
             }
             printLine('');
 
+            // INJEKSI URL PARAMETER
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlDl = parseFloat(urlParams.get('dl'));
+            const urlUl = parseFloat(urlParams.get('ul'));
+
             let expectedDL = 0;
-            while (true) {
-                const input = await promptInput('Enter target DOWNLOAD SLA (in Mbps): ');
-                const parsed = parseFloat(input);
-                if (!isNaN(parsed) && parsed > 0) { expectedDL = parsed; break; }
-            }
-            
             let expectedUL = 0;
-            while (true) {
-                const input = await promptInput('Enter target UPLOAD SLA (in Mbps): ');
-                const parsed = parseFloat(input);
-                if (!isNaN(parsed) && parsed > 0) { expectedUL = parsed; break; }
+
+            if (!isNaN(urlDl) && urlDl > 0 && !isNaN(urlUl) && urlUl > 0) {
+                expectedDL = urlDl;
+                expectedUL = urlUl;
+                await printTypewriter(`[*] Target SLA automatically injected via URL Protocol...`, 'color-yellow');
+            } else {
+                // Fallback kalau link dibuka polosan tanpa parameter
+                while (true) {
+                    const input = await promptInput('Enter target DOWNLOAD SLA (in Mbps): ');
+                    const parsed = parseFloat(input);
+                    if (!isNaN(parsed) && parsed > 0) { expectedDL = parsed; break; }
+                }
+                while (true) {
+                    const input = await promptInput('Enter target UPLOAD SLA (in Mbps): ');
+                    const parsed = parseFloat(input);
+                    if (!isNaN(parsed) && parsed > 0) { expectedUL = parsed; break; }
+                }
             }
             
             printLine('');
