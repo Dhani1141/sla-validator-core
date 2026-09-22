@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Network Diagnostic & SLA Validation Tool</title>
+    <title>Advanced Network Telemetry & SLA Validator</title>
     <style>
         * {
             box-sizing: border-box;
@@ -16,8 +16,7 @@
             margin: 0;
             padding: 20px;
             overflow-x: hidden;
-            /* Biar user bisa tap dimana aja di layar buat fokus ke input */
-            min-height: 100vh; 
+            min-height: 100vh; /* Biar user mobile bisa tap dimana aja */
         }
         #terminal {
             width: 100%;
@@ -44,7 +43,7 @@
             50% { opacity: 0; }
         }
         
-        /* Kamuflase Input Mobile */
+        /* Kamuflase Input Native */
         .terminal-input {
             background: transparent;
             border: none;
@@ -55,16 +54,15 @@
             width: 80px;
             text-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
         }
-        /* Ilangin panah atas-bawah di input number */
         .terminal-input::-webkit-outer-spin-button,
         .terminal-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
-    .terminal-input[type=number] {
-        -moz-appearance: textfield; /* Tetep buat Firefox lama */
-        appearance: none;         /* Standar modern biar linter diem */
-}
+        .terminal-input[type=number] {
+            -moz-appearance: textfield; /* Untuk Firefox Lama */
+            appearance: none;           /* Standar modern */
+        }
 
         /* Custom Color Outputs */
         .color-red { color: #ff3333; text-shadow: 0 0 5px rgba(255, 51, 51, 0.5); }
@@ -124,7 +122,6 @@
             window.scrollTo(0, document.body.scrollHeight);
         }
 
-        // Logic Input baru dengan Native Camouflaged Input
         async function promptInput(promptText) {
             const line = document.createElement('div');
             line.className = 'log-line';
@@ -141,7 +138,6 @@
             inputField.className = 'terminal-input';
             line.appendChild(inputField);
             
-            // Indikator tambahan buat user mobile
             const hintSpan = document.createElement('span');
             hintSpan.className = 'color-gray';
             hintSpan.textContent = ' (Tap here if keyboard not showing)';
@@ -150,10 +146,8 @@
             appendCursor(line);
             window.scrollTo(0, document.body.scrollHeight);
 
-            // Paksa fokus ke input biar keyboard HP muncul otomatis
             inputField.focus();
 
-            // Kalau user tap sembarangan di layar, balikin fokus ke input
             const keepFocus = () => inputField.focus();
             document.body.addEventListener('click', keepFocus);
 
@@ -163,8 +157,8 @@
                         const val = inputField.value;
                         if (val.trim() !== '') {
                             document.body.removeEventListener('click', keepFocus);
-                            inputField.disabled = true; // Kunci inputnya biar ga bisa diubah lagi
-                            hintSpan.remove(); // Hapus tulisan hint biar rapi
+                            inputField.disabled = true;
+                            hintSpan.remove(); 
                             removeCursor();
                             resolve(val);
                         }
@@ -173,8 +167,51 @@
             });
         }
 
+        async function measurePingAndJitter() {
+            let pings = [];
+            for (let i = 0; i < 5; i++) {
+                let start = performance.now();
+                await new Promise(resolve => {
+                    let img = new Image();
+                    img.onload = resolve;
+                    img.onerror = resolve; 
+                    img.src = "https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif?cb=" + Math.random();
+                });
+                pings.push(performance.now() - start);
+            }
+            
+            let avgPing = pings.reduce((a, b) => a + b) / pings.length;
+            
+            let jitter = 0;
+            for(let i = 1; i < pings.length; i++) {
+                jitter += Math.abs(pings[i] - pings[i-1]);
+            }
+            jitter = jitter / (pings.length - 1);
+            
+            return { ping: avgPing, jitter: jitter };
+        }
+
+        async function measureUpload() {
+            const payloadSize = 2 * 1024 * 1024; // 2MB Blob
+            const dummyData = new Uint8Array(payloadSize);
+            const blob = new Blob([dummyData]);
+            const start = performance.now();
+            
+            try {
+                await fetch('https://speed.cloudflare.com/__up', {
+                    method: 'POST',
+                    body: blob
+                });
+                const duration = (performance.now() - start) / 1000;
+                const speedMbps = (payloadSize * 8 / duration) / 1000000;
+                return speedMbps;
+            } catch (e) {
+                return null; 
+            }
+        }
+
         async function runDiagnostics() {
-            await printTypewriter('Initializing Network Diagnostic & SLA Validation Tool...');
+            await printTypewriter('Initializing Advanced Telemetry & SLA Validation Tool...');
             await sleep(500);
             printLine('');
 
@@ -184,79 +221,81 @@
             try {
                 const response = await fetch('https://ipapi.co/json/');
                 const data = await response.json();
-                
                 await printTypewriter(`[+] IP Address: ${data.ip || 'Unknown'}`);
                 await printTypewriter(`[+] ISP/ASN: ${data.org || 'Unknown'} / ${data.asn || 'Unknown'}`);
-                await printTypewriter(`[+] Location: ${data.city || 'Unknown'}, ${data.region || 'Unknown'}, ${data.country_name || 'Unknown'}`);
             } catch (e) {
                 await printTypewriter('[-] Network topology hidden by client security.', 'color-orange');
             }
-            
-            await printTypewriter(`[+] Browser Signature: ${navigator.userAgent}`);
             printLine('');
 
-            let expectedSLA = 0;
+            let expectedDL = 0;
             while (true) {
-                const input = await promptInput('Enter expected bandwidth SLA (in Mbps): ');
+                const input = await promptInput('Enter target DOWNLOAD SLA (in Mbps): ');
                 const parsed = parseFloat(input);
-                if (!isNaN(parsed) && parsed > 0) {
-                    expectedSLA = parsed;
-                    break;
-                } else {
-                    await printTypewriter('[-] Invalid input. Please enter a valid number greater than 0.', 'color-red');
-                    printLine('');
-                }
+                if (!isNaN(parsed) && parsed > 0) { expectedDL = parsed; break; }
+            }
+            
+            let expectedUL = 0;
+            while (true) {
+                const input = await promptInput('Enter target UPLOAD SLA (in Mbps): ');
+                const parsed = parseFloat(input);
+                if (!isNaN(parsed) && parsed > 0) { expectedUL = parsed; break; }
             }
             
             printLine('');
-            await printTypewriter(`[*] SLA Target accepted: ${expectedSLA} Mbps`);
+            await printTypewriter(`[*] Target Locked: ${expectedDL} DL / ${expectedUL} UL Mbps`);
             await sleep(500);
             printLine('');
 
-            await printTypewriter('[*] Preparing unbiased bandwidth measurement...');
-            await sleep(300);
+            // PHASE 1: Ping & Jitter
+            await printTypewriter('[*] Executing Micro-Probes (Ping & Jitter)...');
+            const { ping, jitter } = await measurePingAndJitter();
+            await printTypewriter(`[+] Latency (Ping): ${ping.toFixed(1)} ms`);
+            await printTypewriter(`[+] Network Jitter: ${jitter.toFixed(1)} ms`);
+            printLine('');
 
+            // PHASE 2: Download Ingestion
+            await printTypewriter('[*] Initiating Download Payload (Ingestion)...');
             const targetURL = `https://upload.wikimedia.org/wikipedia/commons/2/2d/Snake_River_%285mb%29.jpg`;
             const fileSizeBits = 5242880 * 8; 
             const fileSizeMB = 5242880 / (1024 * 1024);
-
-            await printTypewriter('[*] Initiating payload transfer (DOM Image Ingestion)...');
             
             const download = new Image();
-            const startTime = performance.now();
+            const startDL = performance.now();
             const cacheBuster = "?cb=" + Math.random();
             
             download.onload = async function() {
-                const endTime = performance.now();
-                const durationSec = (endTime - startTime) / 1000;
+                const durationSecDL = (performance.now() - startDL) / 1000;
+                const speedMbpsDL = (fileSizeBits / durationSecDL) / 1000000;
+                const speedMBpsDL = fileSizeMB / durationSecDL;
                 
-                await printTypewriter('[+] Payload transfer complete.');
+                await printTypewriter(`[+] Download Speed: ${speedMbpsDL.toFixed(2)} Mbps (${speedMBpsDL.toFixed(2)} MB/s)`);
                 printLine('');
                 
+                // PHASE 3: Upload Exfiltration
+                await printTypewriter('[*] Initiating Upload Payload (Exfiltration)...');
+                const speedUL = await measureUpload();
+                
+                if (speedUL === null) {
+                    await printTypewriter(`[-] Upload test blocked by strict client CORS policy.`, 'color-orange');
+                } else {
+                    const speedMBpsUL = speedUL / 8;
+                    await printTypewriter(`[+] Upload Speed: ${speedUL.toFixed(2)} Mbps (${speedMBpsUL.toFixed(2)} MB/s)`);
+                }
+                
+                printLine('');
                 await printTypewriter('[*] Analyzing telemetrics...');
                 await sleep(500);
                 
-                const speedMbps = (fileSizeBits / durationSec) / 1000000;
-                const speedMBps = fileSizeMB / durationSec;
-                const variance = (speedMbps / expectedSLA) * 100;
+                const varianceDL = (speedMbpsDL / expectedDL) * 100;
+                await printTypewriter(`[*] DL SLA Fulfillment: ${varianceDL.toFixed(2)}%`);
                 
-                await printTypewriter(`[+] Transferred: 5.00 MB`);
-                await printTypewriter(`[+] Duration: ${durationSec.toFixed(2)} seconds`);
-                await printTypewriter(`[+] Raw Speed: ${speedMbps.toFixed(2)} Mbps (${speedMBps.toFixed(2)} MB/s)`);
-                printLine('');
-                
-                await printTypewriter(`[*] SLA Validation: Measured ${speedMbps.toFixed(2)} Mbps vs Target ${expectedSLA} Mbps`);
-                await printTypewriter(`[*] SLA Fulfillment: ${variance.toFixed(2)}%`);
-                
-                printLine('');
-                if (variance < 50) {
-                    await printTypewriter(`[CRITICAL] SLA Breach. Severe bandwidth degradation detected.`, 'color-red');
-                } else if (variance >= 50 && variance <= 75) {
-                    await printTypewriter(`[WARNING] Sub-optimal performance. High variance detected.`, 'color-orange');
-                } else if (variance > 75 && variance <= 90) {
-                    await printTypewriter(`[INFO] Acceptable variance within normal network loads.`, 'color-yellow');
+                if (varianceDL < 50) {
+                    await printTypewriter(`[CRITICAL] Severe Download degradation detected. ISP intervention required.`, 'color-red');
+                } else if (varianceDL >= 50 && varianceDL <= 75) {
+                    await printTypewriter(`[WARNING] Sub-optimal download performance.`, 'color-orange');
                 } else {
-                    await printTypewriter(`[OK] Optimal. Network meets SLA standards.`, 'color-green');
+                    await printTypewriter(`[OK] Download variance acceptable. Network operating normally.`, 'color-green');
                 }
                 
                 printLine('');
@@ -264,7 +303,7 @@
             };
 
             download.onerror = async function() {
-                await printTypewriter('[-] INGESTION FAILED: Connection interrupted by client firewall or DNS timeout.', 'color-red');
+                await printTypewriter('[-] DOWNLOAD INGESTION FAILED. Connection interrupted.', 'color-red');
             };
 
             download.src = targetURL + cacheBuster;
