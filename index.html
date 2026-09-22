@@ -296,13 +296,14 @@
                 printLine('');
                 await printTypewriter('--- GENERATING WHATSAPP DISPATCH PAYLOAD ---', 'color-gray');
                 
-                // Rakit teks laporan forensik
+                // Rakit teks laporan forensik (Update lengkap dengan Upload)
                 const reportText = `[LAPORAN FORENSIK JARINGAN]\n` +
                                    `• IP: ${clientIP}\n` +
                                    `• Lokasi Node: ${clientLoc}\n` +
                                    `• ISP/ASN: ${ispOrg}\n` +
-                                   `• Target SLA: ${expectedDL} Mbps\n` +
+                                   `• Target SLA: ${expectedDL} DL / ${expectedUL} UL Mbps\n` +
                                    `• Hasil Download: ${speedMbpsDL.toFixed(2)} Mbps (${varianceDL.toFixed(2)}%)\n` +
+                                   `• Hasil Upload: ${speedMbpsUL.toFixed(2)} Mbps\n` +
                                    `• Latency / Jitter: ${ping.toFixed(1)} ms / ${jitter.toFixed(1)} ms\n` +
                                    `Mohon segera ditindaklanjuti karena terjadi penurunan performa drastis.`;
 
